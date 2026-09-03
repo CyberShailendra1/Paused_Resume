@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+@layer utilities {
+  @media print {
+    body {
+      background: white !important;
+      color: black !important;
+    }
+    header, nav, footer, .no-print {
+      display: none !important;
+    }
+    .print-preview-modal {
+      position: static !important;
+      background: white !important;
+      overflow: visible !important;
+      height: auto !important;
+      width: 100% !important;
+      inset: auto !important;
+      padding: 0 !important;
+      margin: 0 !important;
+    }
+    .print-preview-canvas {
+      background: white !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      overflow: visible !important;
+      transform: none !important;
+      width: 100% !important;
+    }
+    #resume-document-container {
+      box-shadow: none !important;
+      border: none !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+  }
+}
+
+@keyframes indeterminate {
+  0% { transform: translateX(-100%); width: 40%; }
+  50% { transform: translateX(50%); width: 60%; }
+  100% { transform: translateX(200%); width: 40%; }
+}
+
+.animate-indeterminate {
+  animation: indeterminate 1.5s infinite ease-in-out;
+}

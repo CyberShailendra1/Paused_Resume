@@ -1,0 +1,6 @@
+{
+  "name": "Paused AI",
+  "description": "ATS resume checker and customizable resume builder with deterministic format analysis and intelligent keyword matching.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
