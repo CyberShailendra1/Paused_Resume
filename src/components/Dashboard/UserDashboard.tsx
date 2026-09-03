@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   FolderKanban, Plus, Copy, Trash2, Edit3, Download, TrendingUp, 
   CheckCircle2, FileText, Sparkles, User, LogIn, UserPlus, Cloud, CloudCheck, ExternalLink,
-  LineChart, Lock, Globe, Shield
+  LineChart, Lock, Globe, Shield, Share2
 } from 'lucide-react';
 import { SavedResumeVersion, ResumeData } from '../../types/resume';
 import { 
@@ -55,6 +55,18 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
       return;
     }
     exportResumeToPDF(version.resumeData, version.styleSettings);
+  };
+
+  const handleCreateShareLink = async (version: SavedResumeVersion) => {
+    const payload = JSON.stringify({ resumeData: version.resumeData, styles: version.styleSettings });
+    const encoded = window.btoa(unescape(encodeURIComponent(payload)));
+    const shareUrl = `${window.location.origin}/share?data=${encodeURIComponent(encoded)}`;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      alert('View-only resume link copied to your clipboard.');
+    } catch {
+      window.prompt('Copy this view-only resume link:', shareUrl);
+    }
   };
 
   // Synchronize default selectedTrendVersionId when versions load
@@ -557,6 +569,14 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                       title={!(user && !user.isAnonymous) ? "Sign in / Sign up to download ATS PDF" : "Export ATS PDF"}
                     >
                       <Download className="w-3.5 h-3.5" />
+                    </button>
+
+                    <button
+                      onClick={() => handleCreateShareLink(ver)}
+                      className="p-1.5 text-slate-400 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="Copy view-only share link"
+                    >
+                      <Share2 className="w-3.5 h-3.5" />
                     </button>
 
                     {/* Delete */}

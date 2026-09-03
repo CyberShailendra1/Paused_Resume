@@ -9,7 +9,7 @@ import {
   ResumeData, ResumeSection, ResumeStyleSettings, SectionType, 
   ExperienceItem, EducationItem, SkillCategory, ProjectItem, 
   CertificationItem, LanguageItem, AchievementItem, CustomFieldItem,
-  SavedResumeVersion, TemplateId
+  SavedResumeVersion, TemplateId, SuggestedKeywordsData
 } from '../../types/resume';
 import { ResumeTemplateView } from './ResumeTemplates';
 import { analyzeResumeATS } from '../../utils/atsEngine';
@@ -20,17 +20,20 @@ import { useAuth } from '../../context/AuthContext';
 import { AuthModal } from '../Auth/AuthModal';
 import { StyleSettingsPanel } from './StyleSettingsPanel';
 import { AVAILABLE_TEMPLATES } from '../../types/resume';
+import { AutoSuggestedKeywordsBar } from './AutoSuggestedKeywordsBar';
 export { AVAILABLE_TEMPLATES };
 
 interface ResumeBuilderProps {
   initialResumeData?: ResumeData | null;
   targetJobDescription?: string;
+  suggestedKeywordsData?: SuggestedKeywordsData | null;
   onViewDashboard?: () => void;
 }
 
 export const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ 
   initialResumeData, 
   targetJobDescription = '', 
+  suggestedKeywordsData = null,
   onViewDashboard 
 }) => {
   // Resume Data State
@@ -488,6 +491,7 @@ export const ResumeBuilder: React.FC<ResumeBuilderProps> = ({
       experience: boolean;
       education: boolean;
       skills: boolean;
+      certifications: boolean;
     }
   ) => {
     setResume(prev => {
@@ -571,9 +575,23 @@ export const ResumeBuilder: React.FC<ResumeBuilderProps> = ({
           });
         }
 
+        if (selectedSections.certifications && data.certifications && data.certifications.length > 0) {
+          updatedSections.push({
+            id: 'sec-certifications',
+            type: 'certifications',
+            title: 'Certifications',
+            certificationItems: data.certifications.map((cert, idx) => ({
+              id: `cert-${Date.now()}-${idx}`,
+              name: cert.name || 'Certification',
+              issuer: cert.issuer || '',
+              date: cert.date || ''
+            }))
+          });
+        }
+
         // Retain any custom sections that aren't replaced
         prev.sections.forEach(sec => {
-          if (!['summary', 'experience', 'education', 'skills'].includes(sec.type)) {
+          if (!['summary', 'experience', 'education', 'skills', 'certifications'].includes(sec.type)) {
             updatedSections.push(sec);
           }
         });
@@ -694,6 +712,32 @@ export const ResumeBuilder: React.FC<ResumeBuilderProps> = ({
                 categoryName: 'Core Competencies',
                 skills: data.skills
               }]
+            });
+          }
+        }
+
+        if (selectedSections.certifications && data.certifications && data.certifications.length > 0) {
+          const certificationItems = data.certifications.map((cert, idx) => ({
+            id: `cert-${Date.now()}-${idx}`,
+            name: cert.name || 'Certification',
+            issuer: cert.issuer || '',
+            date: cert.date || ''
+          }));
+          const certSecIdx = updatedSections.findIndex(s => s.type === 'certifications');
+          if (certSecIdx >= 0) {
+            updatedSections[certSecIdx] = {
+              ...updatedSections[certSecIdx],
+              certificationItems: [
+                ...certificationItems,
+                ...(updatedSections[certSecIdx].certificationItems || [])
+              ]
+            };
+          } else {
+            updatedSections.push({
+              id: `sec-certifications-${Date.now()}`,
+              type: 'certifications',
+              title: 'Certifications',
+              certificationItems
             });
           }
         }
@@ -833,6 +877,13 @@ export const ResumeBuilder: React.FC<ResumeBuilderProps> = ({
         
         {/* LEFT COLUMN: Section-based Editor */}
         <div className={`lg:col-span-6 space-y-4 ${activeTab === 'preview' ? 'hidden lg:block' : 'block'}`}>
+
+          <AutoSuggestedKeywordsBar
+            resume={resume}
+            keywordsData={suggestedKeywordsData}
+            jobDescription={jobDescription}
+            onUpdateResume={setResume}
+          />
           
           {/* LinkedIn Pre-population Banner */}
           <div className="bg-linear-to-r from-blue-50/90 via-sky-50/60 to-indigo-50/60 border border-blue-200/80 rounded-2xl p-4 flex items-center justify-between gap-3 shadow-xs">

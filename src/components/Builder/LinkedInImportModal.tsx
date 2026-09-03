@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Linkedin, Sparkles, Check, AlertCircle, RefreshCw, X, ArrowRight,
-  Briefcase, GraduationCap, User, Wrench, FileText, CheckSquare, Square
+  Briefcase, GraduationCap, User, Wrench, FileText, CheckSquare, Square, Award
 } from 'lucide-react';
 import { ResumeData } from '../../types/resume';
 
@@ -55,6 +55,7 @@ interface LinkedInImportModalProps {
       experience: boolean;
       education: boolean;
       skills: boolean;
+      certifications: boolean;
     }
   ) => void;
   currentResume: ResumeData;
@@ -160,8 +161,27 @@ export const LinkedInImportModal: React.FC<LinkedInImportModalProps> = ({
     summary: true,
     experience: true,
     education: true,
-    skills: true
+    skills: true,
+    certifications: true
   });
+
+  useEffect(() => {
+    if (isOpen) {
+      setProfileUrl('');
+      setProfileText('');
+      setExtractedData(null);
+      setErrorMessage('');
+      setImportMode('replace');
+      setSelectedSections({
+        contact: true,
+        summary: true,
+        experience: true,
+        education: true,
+        skills: true,
+        certifications: true
+      });
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -537,6 +557,35 @@ Tip: On your LinkedIn profile, select and copy (Ctrl+C / ⌘+C) your Experience 
                           <span key={sIdx} className="px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-slate-700 text-[11px] font-medium">
                             {skill}
                           </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 6. Certifications Card */}
+                {extractedData.certifications && extractedData.certifications.length > 0 && (
+                  <div className={`p-3.5 rounded-xl border transition-all ${
+                    selectedSections.certifications ? 'bg-white border-blue-200 shadow-xs' : 'bg-slate-50 border-slate-200 opacity-60'
+                  }`}>
+                    <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection('certifications')}>
+                      <div className="flex items-center gap-2">
+                        <button type="button" className="text-blue-600">
+                          {selectedSections.certifications ? <CheckSquare className="w-4 h-4 text-blue-600" /> : <Square className="w-4 h-4 text-slate-400" />}
+                        </button>
+                        <Award className="w-4 h-4 text-slate-600" />
+                        <span className="text-xs font-bold text-slate-800">
+                          Certifications ({extractedData.certifications.length})
+                        </span>
+                      </div>
+                      <span className="text-[11px] font-semibold text-blue-600">
+                        {selectedSections.certifications ? 'Selected' : 'Skipped'}
+                      </span>
+                    </div>
+                    {selectedSections.certifications && (
+                      <div className="mt-2.5 pt-2.5 border-t border-slate-100 space-y-1 text-[11px] text-slate-600">
+                        {extractedData.certifications.map((cert, idx) => (
+                          <div key={idx}><strong className="text-slate-800">{cert.name}</strong>{cert.issuer ? ` • ${cert.issuer}` : ''}{cert.date ? ` • ${cert.date}` : ''}</div>
                         ))}
                       </div>
                     )}

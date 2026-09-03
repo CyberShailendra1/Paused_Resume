@@ -29,6 +29,13 @@ export const ResumeChecker: React.FC<ResumeCheckerProps> = ({ onFixInBuilder, on
   const [expandedIssueId, setExpandedIssueId] = useState<string | null>(null);
   const [copiedKeyword, setCopiedKeyword] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [qualityFix, setQualityFix] = useState<{
+    issueId: string;
+    original: string;
+    improved: string;
+    explanation: string;
+  } | null>(null);
+  const [isFixingQuality, setIsFixingQuality] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -92,6 +99,70 @@ export const ResumeChecker: React.FC<ResumeCheckerProps> = ({ onFixInBuilder, on
     setCopiedKeyword(text);
     setTimeout(() => setCopiedKeyword(null), 2000);
   };
+
+  const findQualityTarget = (issue: ATSIssue) => {
+    const lines = resumeText.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+    if (issue.id === 'quality-missing-metrics') {
+      return lines.find(line => /^[-*•–—]\s*/.test(line) && !(/\b\d+(?:[\.,]\d+)?%|\$\d+|\b\d+x\b/i.test(line))) || issue.before;
+    }
+    if (issue.id === 'quality-action-verbs') {
+      return lines.find(line => /^[-*•–—]\s*/.test(line)) || issue.before;
+    }
+    const phraseMatch = issue.id.match(/^quality-passive-(.+)$/);
+    if (phraseMatch) {
+      return lines.find(line => line.toLowerCase().includes(phraseMatch[1].replace(/-/g, ' '))) || issue.before;
+    }
+    return issue.before;
+  };
+
+  const handleFixQualityIssue = async (issue: ATSIssue) => {
+    const targetText = findQualityTarget(issue);
+    setIsFixingQuality(issue.id);
+    try {
+      const response = await fetch('/api/ai/improve-bullet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bullet: targetText,
+          role: 'Resume Checker - Content Quality',
+          context: `${issue.title}. ${issue.fix}${jobDescription ? ` Target role: ${jobDescription.slice(0, 500)}` : ''}`
+        })
+      });
+      const json = await response.json();
+      if (!response.ok || !json.success || !json.data?.improved) {
+        throw new Error(json.error || 'Unable to generate a rewrite.');
+      }
+      setQualityFix({
+        issueId: issue.id,
+        original: targetText,
+        improved: json.data.improved,
+        explanation: json.data.explanation || issue.fix
+      });
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Unable to generate an AI rewrite.');
+    } finally {
+      setIsFixingQuality(null);
+    }
+  };
+
+  const applyQualityFix = () => {
+    if (!qualityFix) return;
+    const original = qualityFix.original.replace(/^[-*•]\s*/, '').trim();
+    const nextText = resumeText.includes(qualityFix.original)
+      ? resumeText.replace(qualityFix.original, qualityFix.improved)
+      : resumeText.replace(original, qualityFix.improved);
+    setResumeText(nextText);
+    setQualityFix(null);
+    triggerAnalysis(nextText, jobDescription);
+  };
+
+  const quickFixTip = analysisResult
+    ? analysisResult.missingKeywords[0]
+      ? `Add “${analysisResult.missingKeywords[0]}” to a recent achievement bullet for the fastest keyword lift.`
+      : analysisResult.stats.metricsCount < analysisResult.stats.bulletCount
+        ? 'Quantify one more achievement with scale, savings, growth, or time to gain the next few points.'
+        : 'Strengthen your weakest bullet with a decisive action verb and a measurable business outcome.'
+    : '';
 
   // Score color helper
   const getScoreTheme = (score: number) => {
@@ -444,6 +515,16 @@ export const ResumeChecker: React.FC<ResumeCheckerProps> = ({ onFixInBuilder, on
                   ? 'Several formatting or content flaws could trigger automatic rejection in corporate ATS filters.'
                   : 'Critical multi-column, table, or formatting issues will prevent automated parsers from reading your text.'}
               </p>
+
+              {quickFixTip && (
+                <div className="relative mt-4 max-w-xs text-left rounded-xl border border-amber-200 bg-amber-50 p-3">
+                  <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-amber-900">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                    Quick Fix
+                  </div>
+                  <p className="mt-1 text-xs leading-relaxed text-amber-950">{quickFixTip}</p>
+                </div>
+              )}
             </div>
 
             {/* Category Breakdown Cards */}
@@ -726,6 +807,23 @@ export const ResumeChecker: React.FC<ResumeCheckerProps> = ({ onFixInBuilder, on
 
                       {/* Expanded "Before" and "Suggested Fix" Content */}
                       <div className="p-4 border-t border-slate-200 bg-white grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+
+                        {issue.category === 'quality' && (
+                          <div className="md:col-span-2 flex justify-end -mb-1">
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleFixQualityIssue(issue);
+                              }}
+                              disabled={isFixingQuality === issue.id}
+                              className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs font-bold flex items-center gap-1.5 transition-colors"
+                            >
+                              {isFixingQuality === issue.id ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
+                              {isFixingQuality === issue.id ? 'Generating...' : 'Fix Automatically'}
+                            </button>
+                          </div>
+                        )}
                         
                         {/* What's Wrong (Before) */}
                         <div className="p-3.5 rounded-lg bg-rose-50/60 border border-rose-200/80">
@@ -782,6 +880,41 @@ export const ResumeChecker: React.FC<ResumeCheckerProps> = ({ onFixInBuilder, on
 
           </div>
 
+        </div>
+      )}
+
+      {qualityFix && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="quality-fix-title">
+          <div className="w-full max-w-2xl rounded-2xl bg-white border border-slate-200 shadow-2xl overflow-hidden">
+            <div className="p-5 border-b border-slate-200 flex items-start justify-between gap-4">
+              <div>
+                <h3 id="quality-fix-title" className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Wand2 className="w-4 h-4 text-indigo-600" /> AI Content Quality Fix
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">Review the targeted rewrite before it changes your resume text.</p>
+              </div>
+              <button type="button" onClick={() => setQualityFix(null)} className="p-1 text-slate-400 hover:text-slate-700" title="Close preview">
+                <AlertCircle className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-5 space-y-3 text-xs">
+              <div className="rounded-xl border border-rose-200 bg-rose-50 p-3">
+                <div className="font-bold uppercase tracking-wider text-rose-800 mb-1">- Before</div>
+                <p className="text-rose-950 leading-relaxed">{qualityFix.original}</p>
+              </div>
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                <div className="font-bold uppercase tracking-wider text-emerald-800 mb-1">+ After</div>
+                <p className="text-emerald-950 leading-relaxed">{qualityFix.improved}</p>
+              </div>
+              <p className="text-slate-600"><strong>Why this helps:</strong> {qualityFix.explanation}</p>
+            </div>
+            <div className="p-4 border-t border-slate-200 flex justify-end gap-2">
+              <button type="button" onClick={() => setQualityFix(null)} className="px-3 py-2 rounded-lg border border-slate-300 text-slate-700 text-xs font-semibold">Keep Original</button>
+              <button type="button" onClick={applyQualityFix} className="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5">
+                <Check className="w-3.5 h-3.5" /> Apply Rewrite
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

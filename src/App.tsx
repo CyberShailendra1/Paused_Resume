@@ -6,11 +6,12 @@ import { UserDashboard } from './components/Dashboard/UserDashboard';
 import { ErrorBoundary } from './components/Error/ErrorBoundary';
 import { ErrorPage } from './components/Error/ErrorPage';
 import { NotFoundPage } from './components/Error/NotFoundPage';
-import { ResumeData } from './types/resume';
+import { SharedResumePage } from './components/Share/SharedResumePage';
+import { ResumeData, SuggestedKeywordsData } from './types/resume';
 import { loadSavedVersions, getInitialResumeData, fetchUserResumesFromCloud } from './utils/resumeStorage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
-export type AppRoute = 'checker' | 'builder' | 'dashboard' | 'not-found' | 'error';
+export type AppRoute = 'checker' | 'builder' | 'dashboard' | 'share' | 'not-found' | 'error';
 
 function parseRouteFromLocation(): AppRoute {
   try {
@@ -18,6 +19,7 @@ function parseRouteFromLocation(): AppRoute {
     if (path === '/' || path === '/checker') return 'checker';
     if (path === '/builder') return 'builder';
     if (path === '/dashboard' || path === '/saved-versions') return 'dashboard';
+    if (path === '/share') return 'share';
     if (path === '/error') return 'error';
     // Any unrecognized path returns not-found
     return 'not-found';
@@ -32,6 +34,7 @@ function AppContent() {
   const [currentPath, setCurrentPath] = useState<string>(() => window.location.pathname || '/');
   const [activeResumeData, setActiveResumeData] = useState<ResumeData | null>(null);
   const [targetJobDescription, setTargetJobDescription] = useState<string>('');
+  const [suggestedKeywordsData, setSuggestedKeywordsData] = useState<SuggestedKeywordsData | null>(null);
   const [hasApiKey, setHasApiKey] = useState<boolean>(true);
 
   // Sync route on popstate (browser back/forward)
@@ -107,6 +110,7 @@ function AppContent() {
         checker: '/',
         builder: '/builder',
         dashboard: '/dashboard',
+        share: '/share',
         error: '/error',
         'not-found': '/404',
       };
@@ -119,11 +123,10 @@ function AppContent() {
   };
 
   // When user clicks "Fix in Builder" from the Checker results
-  const handleFixInBuilder = (resumeData: ResumeData, targetJd?: string) => {
+  const handleFixInBuilder = (resumeData: ResumeData, targetJd?: string, keywordsData?: SuggestedKeywordsData) => {
     setActiveResumeData(resumeData);
-    if (targetJd) {
-      setTargetJobDescription(targetJd);
-    }
+    setTargetJobDescription(targetJd || keywordsData?.targetJobDescription || '');
+    setSuggestedKeywordsData(keywordsData || null);
     navigateTo('builder');
   };
 
@@ -169,6 +172,7 @@ function AppContent() {
           <ResumeBuilder
             initialResumeData={activeResumeData}
             targetJobDescription={targetJobDescription}
+            suggestedKeywordsData={suggestedKeywordsData}
             onViewDashboard={() => navigateTo('dashboard')}
           />
         )}
@@ -180,6 +184,8 @@ function AppContent() {
             onScanNew={() => navigateTo('checker')}
           />
         )}
+
+        {activeTab === 'share' && <SharedResumePage />}
 
         {activeTab === 'not-found' && (
           <NotFoundPage

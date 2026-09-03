@@ -592,6 +592,28 @@ app.post('/api/ai/parse-linkedin', async (req, res) => {
     });
   }
 
+  let profileSourceText = rawText;
+  if (rawUrl && !profileSourceText) {
+    try {
+      const profileResponse = await fetch(rawUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PausedAI Resume Importer)' },
+        signal: AbortSignal.timeout(8000)
+      });
+      if (profileResponse.ok) {
+        const html = await profileResponse.text();
+        profileSourceText = html
+          .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+          .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/&nbsp;|&amp;|&quot;|&#39;/gi, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+      }
+    } catch (error) {
+      console.warn('LinkedIn public profile fetch unavailable:', error);
+    }
+  }
+
   // Derive slug/name from URL if present
   let urlSlug = '';
   let derivedNameFromUrl = '';
@@ -617,7 +639,7 @@ Extract or infer basic and comprehensive professional details into a structured 
 LinkedIn Profile URL provided: "${rawUrl || 'None'}"
 Profile Text provided:
 """
-${rawText.slice(0, 7000) || 'No raw text provided. Infer realistic standard professional details for an ATS tech/business profile based on name: ' + (derivedNameFromUrl || 'Professional')}
+${profileSourceText.slice(0, 7000) || 'No raw text provided. Infer realistic standard professional details for an ATS tech/business profile based on name: ' + (derivedNameFromUrl || 'Professional')}
 """
 
 Extraction Instructions:
@@ -715,7 +737,7 @@ Return strictly valid JSON matching this schema:
   }
 
   // Deterministic fallback parser
-  const fallbackData = parseLinkedInFallback(rawUrl, rawText, derivedNameFromUrl);
+  const fallbackData = parseLinkedInFallback(rawUrl, profileSourceText, derivedNameFromUrl);
   return res.json({ success: true, data: fallbackData, source: 'fallback' });
 });
 
